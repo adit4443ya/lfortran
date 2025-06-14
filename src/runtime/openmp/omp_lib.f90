@@ -11,6 +11,15 @@ integer(c_int), value :: num_threads
 integer(c_int), value :: flags
 end subroutine
 
+subroutine GOMP_task(fn, data, cpyfn, arg_size, arg_align, if_clause, flags, depend) &
+                         bind(C, name="GOMP_task")
+      use, intrinsic :: iso_c_binding
+      type(c_ptr), value :: fn, data, cpyfn, depend
+      integer(c_long), value :: arg_size, arg_align
+      logical(c_bool), value :: if_clause
+      integer(c_int), value :: flags
+end subroutine
+
 integer(c_int) function GOMP_sections_start(count) bind(C, name="GOMP_sections_start")
     import :: c_int
     integer(c_int), value :: count
