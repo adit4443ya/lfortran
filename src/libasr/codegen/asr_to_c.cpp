@@ -744,6 +744,13 @@ R"(
             intrinsic_module = false;
         }
 
+        if(to_lower(x.m_name) == "omp_lib") {
+            headers.insert("omp.h");
+            return;
+        } else if (to_lower(x.m_name) == "iso_c_binding" || to_lower(x.m_name) == "lfortran_intrinsic_iso_c_binding") {
+            return;
+        }
+
         std::string unit_src = "";
         for (auto &item : x.m_symtab->get_scope()) {
             if (ASR::is_a<ASR::Variable_t>(*item.second)) {
@@ -1420,6 +1427,306 @@ R"(    // Initialise Numpy
         CHECK_FAST_C(compiler_options, x)
         this->visit_expr(*x.m_arg);
         src = "strlen(" + src + ")";
+    }
+
+    void visit_OMPRegion(const ASR::OMPRegion_t &x) {
+        std::string opening_pragma;
+        if (x.m_region == ASR::omp_region_typeType::Parallel) {
+            opening_pragma = "#pragma omp parallel ";
+        } else if (x.m_region == ASR::omp_region_typeType::Do) {
+            opening_pragma = "#pragma omp for ";
+        } else if (x.m_region == ASR::omp_region_typeType::Sections) {
+            opening_pragma = "#pragma omp sections ";
+        } else if (x.m_region == ASR::omp_region_typeType::Single) {
+            opening_pragma = "#pragma omp single ";
+        } else if (x.m_region == ASR::omp_region_typeType::Critical) {
+            opening_pragma = "#pragma omp critical ";
+        } else if (x.m_region == ASR::omp_region_typeType::Atomic) {
+            opening_pragma = "#pragma omp atomic ";
+        } else if (x.m_region == ASR::omp_region_typeType::Barrier) {
+            opening_pragma = "#pragma omp barrier ";
+        } else if (x.m_region == ASR::omp_region_typeType::Task) {
+            opening_pragma = "#pragma omp task ";
+        } else if (x.m_region == ASR::omp_region_typeType::Taskwait) {
+            opening_pragma = "#pragma omp taskwait ";
+        } else if (x.m_region == ASR::omp_region_typeType::Master) {
+            opening_pragma = "#pragma omp master ";
+        } else if (x.m_region == ASR::omp_region_typeType::ParallelDo) {
+            opening_pragma = "#pragma omp parallel for ";
+        } else if (x.m_region == ASR::omp_region_typeType::ParallelSections) {
+            opening_pragma = "#pragma omp parallel sections ";
+        } else if (x.m_region == ASR::omp_region_typeType::Taskloop) {
+            opening_pragma = "#pragma omp taskloop ";
+        } else if (x.m_region == ASR::omp_region_typeType::Target) {
+            opening_pragma = "#pragma omp target ";
+        } else if (x.m_region == ASR::omp_region_typeType::Teams) {
+            opening_pragma = "#pragma omp teams ";
+        } else if (x.m_region == ASR::omp_region_typeType::DistributeParallelDo) {
+            opening_pragma = "#pragma omp distribute parallel for ";
+        } else if (x.m_region == ASR::omp_region_typeType::Distribute) {
+            opening_pragma = "#pragma omp distribute ";
+        } else {
+            throw CodeGenError("Unsupported OpenMP region type: " + std::to_string((int)x.m_region));
+        }
+
+        std::string clauses;
+        for(size_t i=0;i<x.n_clauses;i++) {
+            ASR::omp_clause_t* clause = x.m_clauses[i];
+            if (ASR::is_a<ASR::OMPPrivate_t>(*clause)) {
+                ASR::OMPPrivate_t* c = ASR::down_cast<ASR::OMPPrivate_t>(clause);
+                clauses += " private(";
+                std::string vars;
+                for (size_t j=0; j<c->n_vars; j++) {
+                    visit_expr(*c->m_vars[j]);
+                    vars += src;
+                    if (j < c->n_vars - 1) {
+                        vars += ", ";
+                    }
+                }
+                clauses += vars + ")";
+            } else if (ASR::is_a<ASR::OMPShared_t>(*clause)) {
+                ASR::OMPShared_t* c = ASR::down_cast<ASR::OMPShared_t>(clause);
+                clauses += " shared(";
+                std::string vars;
+                for (size_t j=0; j<c->n_vars; j++) {
+                    visit_expr(*c->m_vars[j]);
+                    vars += src;
+                    if (j < c->n_vars - 1) {
+                        vars += ", ";
+                    }
+                }
+                clauses += vars + ")";
+            } else if (ASR::is_a<ASR::OMPNumTeams_t>(*clause)) {
+                ASR::OMPNumTeams_t* c = ASR::down_cast<ASR::OMPNumTeams_t>(clause);
+                clauses += " num_teams(";
+                visit_expr(*c->m_num_teams);
+                clauses += src + ")";
+            } else if (ASR::is_a<ASR::OMPThreadLimit_t>(*clause)) {
+                ASR::OMPThreadLimit_t* c = ASR::down_cast<ASR::OMPThreadLimit_t>(clause);
+                clauses += " thread_limit(";
+                visit_expr(*c->m_thread_limit);
+                clauses += src + ")";
+            } else if (ASR::is_a<ASR::OMPSchedule_t>(*clause)) {
+                ASR::OMPSchedule_t* c = ASR::down_cast<ASR::OMPSchedule_t>(clause);
+                clauses += " schedule(";
+                if (c->m_kind == ASR::schedule_typeType::Static) {
+                    clauses += "static";
+                } else if (c->m_kind == ASR::schedule_typeType::Dynamic) {
+                    clauses += "dynamic";
+                } else if (c->m_kind == ASR::schedule_typeType::Guided) {
+                    clauses += "guided";
+                } else if (c->m_kind == ASR::schedule_typeType::Auto) {
+                    clauses += "auto";
+                } else if (c->m_kind == ASR::schedule_typeType::Runtime) {
+                    clauses += "runtime";
+                }
+                if (c->m_chunk_size) {
+                    clauses += ", ";
+                    visit_expr(*c->m_chunk_size);
+                    clauses += src;
+                }
+                clauses += ")";
+            } else if (ASR::is_a<ASR::OMPReduction_t>(*clause)) {
+                ASR::OMPReduction_t* c = ASR::down_cast<ASR::OMPReduction_t>(clause);
+                clauses += " reduction(";
+                std::string op;
+                if(c->m_operator == ASR::reduction_opType::ReduceAdd) {
+                    op += "+";
+                } else if(c->m_operator == ASR::reduction_opType::ReduceMul) {
+                    op += "*";
+                } else if(c->m_operator == ASR::reduction_opType::ReduceSub) {
+                    op += "-";
+                } else if(c->m_operator == ASR::reduction_opType::ReduceMAX) {
+                    op += "max";
+                } else if(c->m_operator == ASR::reduction_opType::ReduceMIN) {
+                    op += "min";
+                } else {
+                    throw CodeGenError("Unsupported OpenMP reduction operator: " +
+                        std::to_string((int)c->m_operator));
+                }
+                clauses += op + ": ";
+                std::string vars;
+                for (size_t j=0; j<c->n_vars; j++) {
+                    visit_expr(*c->m_vars[j]);
+                    vars += src;
+                    if (j < c->n_vars - 1) {
+                        vars += ", ";
+                    }
+                }
+                clauses += vars + ")";
+            } else if (ASR::is_a<ASR::OMPDevice_t>(*clause)) {
+                ASR::OMPDevice_t* c = ASR::down_cast<ASR::OMPDevice_t>(clause);
+                clauses += " device(";
+                visit_expr(*c->m_device);
+                clauses += src + ")";
+            } else if (ASR::is_a<ASR::OMPMap_t>(*clause)) {
+                // CORRECTED: Handle map clause with proper struct member mapping
+                ASR::OMPMap_t* m = ASR::down_cast<ASR::OMPMap_t>(clause);
+                std::string map_clauses = generate_map_clauses(m);
+                clauses += map_clauses;
+            }
+        }
+        
+        opening_pragma += clauses;
+        
+        if (x.m_region == ASR::omp_region_typeType::Barrier || 
+            x.m_region == ASR::omp_region_typeType::Taskwait) {
+            // These are standalone directives
+            src = opening_pragma + "\n";
+            return;
+        }
+        
+
+        std::string body;
+        for(size_t i=0;i<x.n_body;i++) {
+            this->visit_stmt(*x.m_body[i]);
+            body += src;
+        }
+        if(x.m_region != ASR::omp_region_typeType::Target && x.m_region != ASR::omp_region_typeType::Teams &&
+           x.m_region != ASR::omp_region_typeType::DistributeParallelDo &&
+           x.m_region != ASR::omp_region_typeType::Distribute) {
+            src = opening_pragma + "{\n" + body + "}\n";
+        } else {
+            src =  opening_pragma + "\n" + body + "\n";
+        }
+    }
+
+    // NEW: Helper function to generate proper map clauses for structs
+    std::string generate_map_clauses(ASR::OMPMap_t* m) {
+        std::string result = " map(";
+        
+        // Determine map type
+        std::string map_type;
+        if (m->m_type == ASR::map_typeType::To) {
+            map_type = "to";
+        } else if (m->m_type == ASR::map_typeType::From) {
+            map_type = "from";
+        } else if (m->m_type == ASR::map_typeType::ToFrom) {
+            map_type = "tofrom";
+        } else if (m->m_type == ASR::map_typeType::Alloc) {
+            map_type = "alloc";
+        } else if (m->m_type == ASR::map_typeType::Release) {
+            map_type = "release";
+        } else if (m->m_type == ASR::map_typeType::Delete) {
+            map_type = "delete";
+        }
+        
+        std::vector<std::string> all_mappings;
+        
+        for (size_t j = 0; j < m->n_vars; j++) {
+            if (m->m_vars[j]->type == ASR::exprType::Var) {
+                ASR::Variable_t* var = ASRUtils::EXPR2VAR(m->m_vars[j]);
+                std::string var_name;
+                visit_expr(*m->m_vars[j]);
+                var_name = src;
+                
+                if (is_allocatable_array(var)) {
+                    // CORRECTED: Handle allocatable arrays as structs
+                    std::vector<std::string> struct_mappings = generate_struct_mappings(var_name, var, map_type);
+                    all_mappings.insert(all_mappings.end(), struct_mappings.begin(), struct_mappings.end());
+                } else if (ASRUtils::is_array(var->m_type)) {
+                    // Handle regular arrays
+                    all_mappings.push_back(generate_array_mapping(var_name, var, map_type));
+                } else {
+                    // Handle scalar variables
+                    all_mappings.push_back(map_type + ": " + var_name);
+                }
+            } else {
+                throw CodeGenError("Unsupported OpenMP map variable type: " +
+                    std::to_string((int)m->m_vars[j]->type));
+            }
+        }
+        
+        // Generate multiple map clauses if needed
+        if (all_mappings.size() == 1) {
+            result += all_mappings[0] + ")";
+        } else {
+            result = "";
+            for (size_t i = 0; i < all_mappings.size(); i++) {
+                result += " map(" + all_mappings[i] + ")";
+            }
+        }
+        
+        return result;
+    }
+
+    bool is_allocatable_array(ASR::Variable_t* var) {
+        return ASR::is_a<ASR::Allocatable_t>(*var->m_type) || 
+            (ASRUtils::is_array(var->m_type) && 
+                ASR::down_cast<ASR::Array_t>(ASRUtils::type_get_past_allocatable(var->m_type))->m_physical_type == ASR::array_physical_typeType::DescriptorArray);
+    }
+
+    std::vector<std::string> generate_struct_mappings(const std::string& var_name, ASR::Variable_t* var, const std::string& base_map_type) {
+        std::vector<std::string> mappings;
+        
+        ASR::ttype_t* type = ASRUtils::type_get_past_allocatable(var->m_type);
+        if (ASRUtils::is_array(type)) {
+            ASR::Array_t* arr_type = ASR::down_cast<ASR::Array_t>(type);
+            
+            // 1. Map the data array with proper slice notation
+            std::string data_mapping;
+            if (base_map_type == "to") {
+                data_mapping = "to: " + var_name + "->data[0:";
+            } else if (base_map_type == "from") {
+                data_mapping = "from: " + var_name + "->data[0:";
+            } else {
+                data_mapping = "tofrom: " + var_name + "->data[0:";
+            }
+            
+            // Calculate array size - for now use simple approach
+            // In a more sophisticated implementation, you'd calculate actual bounds
+            if (arr_type->n_dims == 1) {
+                // For 1D arrays, we need to determine the size at runtime
+                // For simplicity, we'll use a large enough slice or calculate from dims
+                data_mapping += var_name + "->dims[0].length-1]";
+            } else {
+                // Multi-dimensional arrays need more complex slice calculation
+                std::string total_size = var_name + "->dims[0].length";
+                for (size_t i = 1; i < arr_type->n_dims; i++) {
+                    total_size += "*" + var_name + "->dims[" + std::to_string(i) + "].length";
+                }
+                data_mapping += total_size + "-1]";
+            }
+            mappings.push_back(data_mapping);
+            
+            // 2. Map dimension descriptors (usually 'to' since they're metadata)
+            for (size_t i = 0; i < arr_type->n_dims; i++) {
+                std::string dim_mapping = "to: " + var_name + "->dims[" + std::to_string(i) + "].lower_bound, " +
+                                        var_name + "->dims[" + std::to_string(i) + "].length, " +
+                                        var_name + "->dims[" + std::to_string(i) + "].stride";
+                mappings.push_back(dim_mapping);
+            }
+            
+            // 3. Map other struct members as needed
+            mappings.push_back("to: " + var_name + "->n_dims");
+            
+            // Map offset - use 'from' if base is 'from' or 'tofrom', otherwise 'to'
+            if (base_map_type == "from" || base_map_type == "tofrom") {
+                mappings.push_back("from: " + var_name + "->offset");
+            } else {
+                mappings.push_back("to: " + var_name + "->offset");
+            }
+        }
+        
+        return mappings;
+    }
+
+    std::string generate_array_mapping(const std::string& var_name, ASR::Variable_t* var, const std::string& map_type) {
+        ASR::Array_t* arr_type = ASR::down_cast<ASR::Array_t>(var->m_type);
+        
+        std::string mapping = map_type + ": " + var_name;
+        
+        // Add array slice notation if needed
+        if (arr_type->n_dims == 1 && arr_type->m_dims[0].m_start && arr_type->m_dims[0].m_length) {
+            mapping += "[";
+            visit_expr(*arr_type->m_dims[0].m_start);
+            std::string start = src;
+            visit_expr(*arr_type->m_dims[0].m_length);
+            std::string length = src;
+            mapping += start + ":" + length + "]";
+        }
+        
+        return mapping;
     }
 
 };

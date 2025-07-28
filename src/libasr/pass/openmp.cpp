@@ -2507,6 +2507,7 @@ class ParallelRegionVisitor :
         }
 
         void visit_OMPRegion(const ASR::OMPRegion_t &x) {
+
             nesting_lvl++;
             nested_lowered_body = {};
             switch (x.m_region) {
