@@ -32,7 +32,8 @@ public:
     int counter;
 
     bool target_offload_enabled;
-    int kernel_counter; // To generate unique kernel names
+    std::vector<std::string> kernel_func_names;
+    int kernel_counter=0; // To generate unique kernel names
     std::string current_kernel_name; // Track current kernel for wrapper
     std::vector<std::pair<std::string, ASR::OMPMap_t*>> map_vars; // Track map vars for target offload
     std::string indent() {
@@ -897,6 +898,21 @@ R"(    // Initialise Numpy
             contains += kernel_func_code;
         }
 
+        if (target_offload_enabled && !kernel_func_names.empty()) {
+            std::string dispatch_code = "#ifndef USE_GPU\n";
+            dispatch_code += "void compute_kernel_wrapper(void **args, void *func) {\n";
+            for (const auto &kname : kernel_func_names) {
+                dispatch_code += "    if (func == (void*)" + kname + ") {\n";
+                dispatch_code += "        " + kname + "_wrapper(args);\n";
+                dispatch_code += "        return;\n";
+                dispatch_code += "    }\n";
+            }
+            dispatch_code += "    fprintf(stderr, \"Unknown kernel function\\n\");\n";
+            dispatch_code += "    exit(1);\n";
+            dispatch_code += "}\n#endif\n";
+            contains += dispatch_code;
+        }
+
         src = contains
                 + "int main(int argc, char* argv[])\n{\n"
                 + indent1 + "_lpython_set_argv(argc, argv);\n"
@@ -1637,11 +1653,11 @@ void visit_OMPRegion(const ASR::OMPRegion_t &x) {
                 for (const auto &mv : map_vars) {
                     target_code += indent() + "float *d_" + mv.first + "_data = NULL;\n";
                 }
-
+                target_code += indent() + "cudaError_t err;\n";
                 // Allocate device memory for data
                 for (const auto &mv : map_vars) {
                     target_code += indent() + "size_t " + mv.first + "_data_size = " + mv.first + "->dims[0].length * sizeof(float);\n";
-                    target_code += indent() + "cudaError_t err = cudaMalloc((void**)&d_" + mv.first + "_data, " + mv.first + "_data_size);\n";
+                    target_code += indent() + "err = cudaMalloc((void**)&d_" + mv.first + "_data, " + mv.first + "_data_size);\n";
                     target_code += indent() + "if (err != cudaSuccess) {\n";
                     target_code += indent() + "    fprintf(stderr, \"cudaMalloc failed for " + mv.first + "_data: %s\\n\", cudaGetErrorString(err));\n";
                     target_code += indent() + "    exit(1);\n";
@@ -1716,7 +1732,9 @@ void visit_OMPRegion(const ASR::OMPRegion_t &x) {
                     teams_code += src;
                 }
                 src = teams_code;
-            } else if (x.m_region == ASR::omp_region_typeType::DistributeParallelDo) {
+            } else if (x.m_region == ASR::omp_region_typeType::DistributeParallelDo ||
+                       x.m_region == ASR::omp_region_typeType::Distribute ||
+                       x.m_region == ASR::omp_region_typeType::ParallelDo) {
                 // Distribute Parallel Do: Generate kernel and launch
                 if (x.n_body != 1 || !ASR::is_a<ASR::DoLoop_t>(*x.m_body[0])) {
                     throw CodeGenError("Distribute Parallel Do must contain a single DoLoop");
@@ -1725,6 +1743,7 @@ void visit_OMPRegion(const ASR::OMPRegion_t &x) {
                 ASR::DoLoop_t* loop = ASR::down_cast<ASR::DoLoop_t>(x.m_body[0]);
                 std::string kernel_name = "compute_kernel_" + std::to_string(kernel_counter++);
                 current_kernel_name = kernel_name;
+                kernel_func_names.push_back(kernel_name);
 
                 // Extract loop head
                 std::string idx_var;

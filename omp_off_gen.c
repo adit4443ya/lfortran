@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-// #include <lfortran_i-I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/ -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/ /DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime/lfortran_intrinsics.cntrinsics.h>
+#include <lfortran_intrinsics.h>
 
 
 #ifdef USE_GPU
@@ -27,22 +27,14 @@ struct r32
     bool is_allocated;
 };
 
-float _lcompilers_real_i32(int32_t x);
 
 
 
 // Implementations
-float _lcompilers_real_i32(int32_t x)
-{
-    float _lcompilers_real_i32;
-    _lcompilers_real_i32 = (float)(x);
-    return _lcompilers_real_i32;
-}
-
 #ifdef USE_GPU
 __global__
 #endif
-void compute_kernel_21997(struct r32 *a, struct r32 *b, int i_n) {
+void compute_kernel_0(struct r32 *a, struct r32 *b, int i_n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
     if (i <= i_n) {
             a->data[((0 + (a->dims[0].stride * (i - a->dims[0].lower_bound))) + a->offset)] = (float)(i) + b->data[((0 + (b->dims[0].stride * (i - b->dims[0].lower_bound))) + b->offset)]*(float)(340);
@@ -50,17 +42,27 @@ void compute_kernel_21997(struct r32 *a, struct r32 *b, int i_n) {
 }
 
 #ifndef USE_GPU
-void compute_kernel_wrapper(void **args) {
+void compute_kernel_0_wrapper(void **args) {
     struct r32 *a = *(struct r32**)args[0];
     struct r32 *b = *(struct r32**)args[1];
     int i_n = *(int*)args[2];
-    compute_kernel_21997(a, b, i_n);
+    compute_kernel_0(a, b, i_n);
 }
 #endif
 
+#ifndef USE_GPU
+void compute_kernel_wrapper(void **args, void *func) {
+    if (func == (void*)compute_kernel_0) {
+        compute_kernel_0_wrapper(args);
+        return;
+    }
+    fprintf(stderr, "Unknown kernel function\n");
+    exit(1);
+}
+#endif
 int main(int argc, char* argv[])
 {
-    // _lpython_set_argv(argc, argv);
+    _lpython_set_argv(argc, argv);
     int32_t __libasr_index_0_;
     struct r32 a_value;
     struct r32* a = &a_value;
@@ -85,13 +87,13 @@ int main(int argc, char* argv[])
     a->dims[0].lower_bound = 1;
     a->dims[0].length = 10000000;
     a->dims[0].stride = 1;
-    a->data = (float*) malloc(1*a->dims[0].length*sizeof(float));
+    a->data = (float*) _lfortran_malloc(1*a->dims[0].length*sizeof(float));
     a->is_allocated = true;
     b->n_dims = 1;
     b->dims[0].lower_bound = 1;
     b->dims[0].length = 10000000;
     b->dims[0].stride = 1;
-    b->data = (float*) malloc(1*b->dims[0].length*sizeof(float));
+    b->data = (float*) _lfortran_malloc(1*b->dims[0].length*sizeof(float));
     b->is_allocated = true;
     for (__libasr_index_0_=((int32_t)b->dims[1-1].lower_bound); __libasr_index_0_<=((int32_t) b->dims[1-1].length + b->dims[1-1].lower_bound - 1); __libasr_index_0_++) {
         b->data[((0 + (b->dims[0].stride * (__libasr_index_0_ - b->dims[0].lower_bound))) + b->offset)] = (float)(5);
@@ -99,14 +101,15 @@ int main(int argc, char* argv[])
 
     float *d_a_data = NULL;
     float *d_b_data = NULL;
+    cudaError_t err;
     size_t a_data_size = a->dims[0].length * sizeof(float);
-    cudaError_t err = cudaMalloc((void**)&d_a_data, a_data_size);
+    err = cudaMalloc((void**)&d_a_data, a_data_size);
     if (err != cudaSuccess) {
         fprintf(stderr, "cudaMalloc failed for a_data: %s\n", cudaGetErrorString(err));
         exit(1);
     }
     size_t b_data_size = b->dims[0].length * sizeof(float);
-     err = cudaMalloc((void**)&d_b_data, b_data_size);
+    err = cudaMalloc((void**)&d_b_data, b_data_size);
     if (err != cudaSuccess) {
         fprintf(stderr, "cudaMalloc failed for b_data: %s\n", cudaGetErrorString(err));
         exit(1);
@@ -153,7 +156,7 @@ int main(int argc, char* argv[])
     dim3 grid_dim = {blocks, 1, 1};
     dim3 block_dim = {threads_per_block, 1, 1};
     void *kernel_args[] = {&d_a_struct, &d_b_struct, &i_n};
-    err = cudaLaunchKernel((void*)compute_kernel_21997, grid_dim, block_dim, kernel_args, 0, NULL);
+    err = cudaLaunchKernel((void*)compute_kernel_0, grid_dim, block_dim, kernel_args, 0, NULL);
     if (err != cudaSuccess) {
         fprintf(stderr, "cudaLaunchKernel failed: %s\n", cudaGetErrorString(err));
         exit(1);

@@ -76,7 +76,7 @@ cudaError_t cudaDeviceSynchronize(void) {
 }
 
 // Forward declaration for the kernel wrapper
-void compute_kernel_wrapper(void **args);
+void compute_kernel_wrapper(void **args, void *func);
 
 // kernel execution emulation
 cudaError_t cudaLaunchKernel(void *func, dim3 grid_dim, dim3 block_dim, 
@@ -117,7 +117,7 @@ cudaError_t cudaLaunchKernel(void *func, dim3 grid_dim, dim3 block_dim,
                 gridDim = grid_dim;
                 
                 // Execute kernel for this thread
-                compute_kernel_wrapper(args);
+                compute_kernel_wrapper(args, func);
             }
         }
     }
