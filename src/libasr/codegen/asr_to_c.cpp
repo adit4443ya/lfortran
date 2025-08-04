@@ -1942,7 +1942,7 @@ void visit_OMPRegion(const ASR::OMPRegion_t &x) {
     std::string generate_array_mapping(const std::string& var_name, ASR::Variable_t* var, const std::string& map_type) {
         ASR::Array_t* arr_type = ASR::down_cast<ASR::Array_t>(var->m_type);
         
-        std::string mapping = map_type + ": " + var_name;
+        std::string mapping = map_type + ": " + var_name+ "->data";
         
         // Add array slice notation if needed
         if (arr_type->n_dims == 1 && arr_type->m_dims[0].m_start && arr_type->m_dims[0].m_length) {
