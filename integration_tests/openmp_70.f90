@@ -10,7 +10,7 @@ program openmp_70
         !$omp teams
             !$omp distribute parallel do
                 do i = 1, 10000000
-                    a(i) = real(i) + b(i)*340
+                    a(i) = i + b(i)*340
                 end do
             !$omp end distribute parallel do
         !$omp end teams

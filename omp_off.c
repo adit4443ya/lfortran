@@ -21,18 +21,10 @@ struct r32
     bool is_allocated;
 };
 
-float _lcompilers_real_i32(int32_t x);
 
 
 
 // Implementations
-float _lcompilers_real_i32(int32_t x)
-{
-    float _lcompilers_real_i32;
-    _lcompilers_real_i32 = (float)(x);
-    return _lcompilers_real_i32;
-}
-
 int main(int argc, char* argv[])
 {
     _lpython_set_argv(argc, argv);
@@ -75,7 +67,7 @@ int main(int argc, char* argv[])
 #pragma omp teams 
 #pragma omp distribute parallel for 
     for (i=1; i<=10000000; i++) {
-        a->data[((0 + (a->dims[0].stride * (i - a->dims[0].lower_bound))) + a->offset)] = _lcompilers_real_i32(i) + b->data[((0 + (b->dims[0].stride * (i - b->dims[0].lower_bound))) + b->offset)]*(float)(340);
+        a->data[((0 + (a->dims[0].stride * (i - a->dims[0].lower_bound))) + a->offset)] = (float)(i) + b->data[((0 + (b->dims[0].stride * (i - b->dims[0].lower_bound))) + b->offset)]*(float)(340);
     }
 
 
@@ -92,4 +84,3 @@ int main(int argc, char* argv[])
     // FIXME: implicit deallocate(a, b, );
     return 0;
 }
-// clang -fopenmp --offload-arch=sm_89 -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/ /DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime/lfortran_intrinsics.c omp_off.c --libomptarget-nvptx-bc-path="$LIBOMPTARGET_NVPTX_BC_PATH" -L"$CONDA_PREFIX/lib" -L"$CONDA_PREFIX/lib/clang/18.1.8/lib" -Wl,-rpath,"$CONDA_PREFIX/lib" -lm -o a && ./a

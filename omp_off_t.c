@@ -208,9 +208,3 @@ int main(int argc, char* argv[])
     
     return 0;
 }
-//gcc -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/ -c /DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime/lfortran_intrinsics.c -o intrinsic.o
-//gcc  -fopenmp -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/ cpu_impl.c omp_off_gen.c intrinsic.o -lm -o a && ./a && rm a
-
-
-// nvcc -O2 -x cu -DUSE_GPU -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/libasr/runtime -I/DATA/prajjwal/Dynamic-MIS/Fully_Dynamic_MIS/ofld/lfortran/src/  -c omp_off_gen.c -o omp_off_gen.o
-// nvcc intrinsic.o omp_off_gen.o -lm -o a && ./a && rm ./a
